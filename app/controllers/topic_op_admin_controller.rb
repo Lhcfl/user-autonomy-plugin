@@ -2,6 +2,8 @@
 
 require_relative "../lib/bot.rb"
 
+module ::UserAutonomyModule
+
 class TopicOpAdminController < ::ApplicationController
   before_action :ensure_logged_in
 
@@ -512,4 +514,6 @@ class TopicOpAdminController < ::ApplicationController
       render json: { success: false }
     end
   end
+end
+
 end
