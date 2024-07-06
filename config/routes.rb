@@ -8,8 +8,7 @@ UserAutonomyModule::Engine.routes.draw do
   post "/set_topic_op_timer" => "topic_op_admin#set_topic_op_timer"
   put "/topic_op_convert_topic" => "topic_op_admin#topic_op_convert_topic"
   get "/get_topic_op_banned_users" => "topic_op_admin#get_topic_op_banned_users"
-  put "/update_topic_op_banned_users" =>
-        "topic_op_admin#update_topic_op_banned_users"
+  put "/update_topic_op_banned_users" => "topic_op_admin#update_topic_op_banned_users"
 end
 
 Discourse::Application.routes.draw { mount ::UserAutonomyModule::Engine, at: "/topic_op_admin" }
