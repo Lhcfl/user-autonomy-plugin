@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 module ::UserAutonomyModule
   class Engine < ::Rails::Engine
     engine_name PLUGIN_NAME
