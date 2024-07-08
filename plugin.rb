@@ -9,10 +9,6 @@
 
 enabled_site_setting :user_autonomy_plugin_enabled
 
-module ::UserAutonomyModule
-  PLUGIN_NAME = "user-autonomy-plugin"
-end
-
 register_asset "stylesheets/topic-op-admin.scss"
 if respond_to?(:register_svg_icon)
   register_svg_icon "cog"
@@ -20,18 +16,16 @@ if respond_to?(:register_svg_icon)
   register_svg_icon "envelope-open-text"
 end
 
-require_relative "app/lib/bot.rb"
-require_relative "lib/user_autonomy_module/engine.rb"
+require_relative "app/lib/bot"
 
 after_initialize do
   %w[
-    app/controllers/topic_op_admin_controller.rb
-    app/lib/bot.rb
-    app/models/topic_op_admin_status.rb
-    app/serializers/topic_op_admin_status_serializer.rb
-    app/models/bot_logging_topic.rb
-    app/lib/topic_op_admin_handle_new_posts.rb
-    app/models/topic_op_banned_user.rb
+    app/controllers/topic_op_admin_controller
+    app/models/topic_op_admin_status
+    app/serializers/topic_op_admin_status_serializer
+    app/models/bot_logging_topic
+    app/lib/topic_op_admin_handle_new_posts
+    app/models/topic_op_banned_user
   ].each { |f| require_relative File.expand_path("../#{f}", __FILE__) }
 
   add_to_class(:user, :can_manipulate_topic_op_adminable?) do
