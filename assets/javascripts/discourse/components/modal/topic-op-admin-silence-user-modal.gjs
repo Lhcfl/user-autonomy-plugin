@@ -124,7 +124,10 @@ export default class TopicOpAdminSilenceUserModal extends Component {
               <p>
                 {{i18n "topic_op_admin.silence_modal.banned_users"}}
               </p>
-              <TopicOpAdminBannedUsers @users={{this.banned_users}} @onUpdated={{this.setUnmute}}/>
+              <TopicOpAdminBannedUsers
+                @users={{this.banned_users}}
+                @onUpdated={{this.setUnmute}}
+              />
             {{/if}}
           </div>
         </ConditionalLoadingSpinner>

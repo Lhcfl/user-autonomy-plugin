@@ -51,9 +51,13 @@ after_initialize do
     user.can_manipulate_topic_op_adminable?
   end
 
-  add_to_class(:topic, :topic_op_admin_status?) { UserAutonomyModule::TopicOpAdminStatus.getRecord?(id) }
+  add_to_class(:topic, :topic_op_admin_status?) do
+    UserAutonomyModule::TopicOpAdminStatus.getRecord?(id)
+  end
   add_to_serializer(:topic_view, :topic_op_admin_status) do
-    UserAutonomyModule::TopicOpAdminStatusSerializer.new(topic.topic_op_admin_status?).as_json[:topic_op_admin_status]
+    UserAutonomyModule::TopicOpAdminStatusSerializer.new(topic.topic_op_admin_status?).as_json[
+      :topic_op_admin_status
+    ]
   end
 
   add_to_class(:guardian, :can_close_topic_as_op?) do |topic|
@@ -85,5 +89,10 @@ after_initialize do
     return true if user.admin? || user.moderator?
     return false if user.silenced_till
     topic.topic_op_admin_status?.can_silence && user.id == topic.user_id
+  end
+  add_to_class(:guardian, :can_fold_post_as_op?) do |topic|
+    return false unless SiteSetting.user_autonomy_plugin_enabled
+    return false if user.silenced_till
+    topic.topic_op_admin_status?.can_fold_posts && user.id == topic.user_id
   end
 end
