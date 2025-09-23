@@ -16,9 +16,6 @@ user_autonomy:
     type: integer
     min: -100
     client: false
-  topic_op_admin_bot_override_user:
-    default: false
-    client: false
   topic_op_admin_enable_topic_log:
     default: false
     client: false
@@ -89,6 +86,12 @@ user_autonomy:
     default: ""
     allow_any: false
   topic_op_admin_tags_autogrant_can_make_PM:
+    client: false
+    type: tag_list
+    list_type: compact
+    default: ""
+    allow_any: false
+  topic_op_admin_tags_autogrant_can_fold_posts:
     client: false
     type: tag_list
     list_type: compact

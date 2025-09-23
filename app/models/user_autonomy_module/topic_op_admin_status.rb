@@ -4,17 +4,17 @@ module UserAutonomyModule
   class TopicOpAdminStatus < ::ActiveRecord::Base
     self.table_name = "topic_op_admin_status"
 
-    def self.getRecord?(id)
-      ret = self.find_by(id:)
-      self.updateRecord(id) unless ret
-      ret = self.find_by(id:)
+    def is_not_default?
+      !is_default
     end
 
-    def self.updateRecord(id, **new_status)
-      if self.exists?(id:)
-        self.find_by(id:).update!(is_default: false, **new_status)
+    def self.create_or_update!(params)
+      old = self.find_by(id: params[:id])
+      if old.present?
+        old.update!(is_default: false, **params)
+        old
       else
-        self.create(id: id, **new_status)
+        self.create!(params)
       end
     end
   end

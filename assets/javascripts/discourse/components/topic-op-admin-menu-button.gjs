@@ -2,33 +2,59 @@ import Component from "@glimmer/component";
 import { tracked } from "@glimmer/tracking";
 import { action } from "@ember/object";
 import { service } from "@ember/service";
+import DButton from "discourse/components/d-button";
+import DropdownMenu from "discourse/components/dropdown-menu";
 import EditSlowModeModal from "discourse/components/modal/edit-slow-mode";
 import EditTopicTimerModal from "discourse/components/modal/edit-topic-timer";
+import concatClass from "discourse/helpers/concat-class";
+import icon from "discourse/helpers/d-icon";
 import { ajax } from "discourse/lib/ajax";
 import { popupAjaxError } from "discourse/lib/ajax-error";
+import { bind } from "discourse/lib/decorators";
 import { i18n } from "discourse-i18n";
+import DMenu from "float-kit/components/d-menu";
 import RequestTopicOpAdminForm from "./modal/request-op-admin-form";
 import SetTopicOpAdminStatusModal from "./modal/set-topic-op-admin-status";
 import TellReasonForm from "./modal/tell-reason-form";
 import TopicOpAdminSilenceUserModal from "./modal/topic-op-admin-silence-user-modal";
 
 export default class TopicOpAdminMenuButton extends Component {
+  static shouldRender(attrs, { currentUser }) {
+    if (currentUser == null || !currentUser.can_create_topic) {
+      return false;
+    }
+    const topic = attrs.topic ?? attrs.model;
+    if (topic == null || topic.isPrivateMessage) {
+      return false;
+    }
+    return true;
+  }
+
   @service currentUser;
   @service siteSettings;
   @service dialog;
   @service modal;
+  @service appEvents;
 
-  @tracked updateTrigger = 1;
+  @tracked trick = 1;
+
+  constructor() {
+    super(...arguments);
+    this.appEvents.on("user-autonomy:changed", this.onUserAutonomyChanged);
+  }
+
+  willDestroy() {
+    super.willDestroy(...arguments);
+    this.appEvents.off("user-autonomy:changed", this.onUserAutonomyChanged);
+  }
+
+  @bind
+  onUserAutonomyChanged() {
+    this.trick = this.trick + 1;
+  }
 
   get topic() {
     return this.args.model ?? this.args.topic;
-  }
-
-  static shouldRender(attrs, { currentUser }) {
-    if (currentUser == null || !currentUser.can_create_topic) return false;
-    const topic = attrs.topic ?? attrs.model;
-    if (topic == null || topic.isPrivateMessage) return false;
-    return true;
   }
 
   get showButton() {
@@ -53,12 +79,16 @@ export default class TopicOpAdminMenuButton extends Component {
   }
 
   get buttonList() {
-    (function () {})(this.updateTrigger); // Trigger
     /**
      * @typedef {{ label: string, icon: string, class: string, action: ()=>void, group?: string}} ButtonItem
      */
     /** @type {ButtonItem[]} */
     const res = [];
+
+    // trick
+    if (this.trick === 0) {
+      return;
+    }
 
     if (
       this.currentUser == null ||
@@ -88,7 +118,7 @@ export default class TopicOpAdminMenuButton extends Component {
         label: "topic_op_admin.apply_for_op_admin",
         group: "manipulating",
       });
-      if (this.topic.topic_op_admin_status.can_close) {
+      if (this.topic.topic_op_admin_status?.can_close) {
         res.push({
           group: "topic",
           action: () => this.performToggle("closed"),
@@ -105,7 +135,7 @@ export default class TopicOpAdminMenuButton extends Component {
               }),
         });
       }
-      if (this.topic.topic_op_admin_status.can_archive) {
+      if (this.topic.topic_op_admin_status?.can_archive) {
         if (!this.topic.isPrivateMessage) {
           res.push({
             class: "topic-OP-admin-archive",
@@ -118,7 +148,7 @@ export default class TopicOpAdminMenuButton extends Component {
           });
         }
       }
-      if (this.topic.topic_op_admin_status.can_visible) {
+      if (this.topic.topic_op_admin_status?.can_visible) {
         res.push({
           class: "topic-OP-admin-visible",
           action: () => this.performToggle("visible"),
@@ -129,7 +159,7 @@ export default class TopicOpAdminMenuButton extends Component {
           group: "topic",
         });
       }
-      if (this.topic.topic_op_admin_status.can_slow_mode) {
+      if (this.topic.topic_op_admin_status?.can_slow_mode) {
         res.push({
           class: "topic-OP-admin-slow-mode",
           action: this.showTopicSlowModeUpdate,
@@ -139,7 +169,7 @@ export default class TopicOpAdminMenuButton extends Component {
         });
       }
 
-      if (this.topic.topic_op_admin_status.can_set_timer) {
+      if (this.topic.topic_op_admin_status?.can_set_timer) {
         res.push({
           class: "admin-topic-timer-update",
           action: this.showTopicTimerModal,
@@ -149,7 +179,7 @@ export default class TopicOpAdminMenuButton extends Component {
         });
       }
 
-      if (this.topic.topic_op_admin_status.can_make_PM) {
+      if (this.topic.topic_op_admin_status?.can_make_PM) {
         res.push({
           class: "topic-admin-convert",
           action: this.topic.isPrivateMessage
@@ -166,7 +196,7 @@ export default class TopicOpAdminMenuButton extends Component {
 
     if (
       (this.topic.user_id === this.currentUser.id &&
-        this.topic.topic_op_admin_status.can_silence) ||
+        this.topic.topic_op_admin_status?.can_silence) ||
       this.currentUser.staff
     ) {
       res.push({
@@ -183,29 +213,9 @@ export default class TopicOpAdminMenuButton extends Component {
 
   @action
   showSetTopicOpAdminStatus() {
-    const topic = this.topic;
     this.modal.show(SetTopicOpAdminStatusModal, {
       model: {
-        topic,
-        enables: {
-          close: topic.topic_op_admin_status.can_close,
-          archive: topic.topic_op_admin_status.can_archive,
-          make_PM: topic.topic_op_admin_status.can_make_PM,
-          visible: topic.topic_op_admin_status.can_visible,
-          slow_mode: topic.topic_op_admin_status.can_slow_mode,
-          set_timer: topic.topic_op_admin_status.can_set_timer,
-          silence: topic.topic_op_admin_status.can_silence,
-          fold_posts: topic.topic_op_admin_status.can_fold_posts,
-        },
-        cb: (modal) => {
-          const new_status = {};
-          for (const key of Object.keys(this.topic.topic_op_admin_status)) {
-            // "can_open" -> "open"
-            new_status[key] = modal.enables[key.slice(4)];
-          }
-          this.topic.set("topic_op_admin_status", new_status);
-          this.updateTrigger = 1;
-        },
+        topic: this.topic,
       },
     });
   }
@@ -239,7 +249,7 @@ export default class TopicOpAdminMenuButton extends Component {
 
   toggleTopicStatus(key, reason) {
     return this._send_ajax(
-      "/topic_op_admin/update_topic_status/",
+      "/topic-op-admin/update_topic_status/",
       "POST",
       {
         status: key,
@@ -251,7 +261,7 @@ export default class TopicOpAdminMenuButton extends Component {
 
   convertTopic(type, reason) {
     return this._send_ajax(
-      "/topic_op_admin/topic_op_convert_topic",
+      "/topic-op-admin/topic_op_convert_topic",
       "PUT",
       {
         type,
@@ -328,4 +338,42 @@ export default class TopicOpAdminMenuButton extends Component {
       },
     });
   }
+
+  <template>
+    {{#if this.showButton}}
+      <span class="topic-OP-admin-menu-button-container">
+        <span class="topic-OP-admin-menu-button">
+          <DMenu
+            @identifier="topic-OP-admin-menu"
+            @modalForMobile={{true}}
+            @autofocus={{true}}
+            @triggerClass="btn-default btn-icon toggle-OP-admin-menu"
+          >
+            <:trigger>
+              {{icon "gear"}}
+            </:trigger>
+            <:content>
+              <DropdownMenu as |dropdown|>
+                {{#each this.buttonListGrouped as |button|}}
+                  {{#if button}}
+                    <dropdown.item>
+                      <DButton
+                        @label={{button.label}}
+                        @translatedLabel={{button.translatedLabel}}
+                        @icon={{button.icon}}
+                        class={{concatClass "btn-transparent" button.className}}
+                        @action={{button.action}}
+                      />
+                    </dropdown.item>
+                  {{else}}
+                    <dropdown.divider />
+                  {{/if}}
+                {{/each}}
+              </DropdownMenu>
+            </:content>
+          </DMenu>
+        </span>
+      </span>
+    {{/if}}
+  </template>
 }
