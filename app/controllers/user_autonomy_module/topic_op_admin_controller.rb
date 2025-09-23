@@ -5,7 +5,7 @@ module ::UserAutonomyModule
     requires_plugin PLUGIN_NAME
     before_action :ensure_logged_in
 
-    def update_topic_status
+    def update_status
       params.require(:status)
       params.require(:enabled)
       params.permit(:until)

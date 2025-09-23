@@ -258,4 +258,63 @@ RSpec.describe UserAutonomyModule::TopicOpAdminController do
       end
     end
   end
+
+  describe "#update_status" do
+    context "when user is not the owner" do
+      before { sign_in(user) }
+
+      fab!(:status) { Fabricate(:topic_op_admin_status, id: topic.id, can_make_PM: true) }
+
+      it "cannot update the status" do
+        post "/topic-op-admin/update-status/#{topic.id}.json",
+             params: {
+               status: "archived",
+               enabled: true,
+               reason: "hi",
+             }
+        expect(response.status).to eq(403)
+        expect(topic.archived).to eq(false)
+      end
+    end
+
+    context "when user is the owner" do
+      before { sign_in(topic.user) }
+
+      context "when it is allowed" do
+        fab!(:status) { Fabricate(:topic_op_admin_status, id: topic.id, can_archive: true) }
+
+        it "can update the status" do
+          post "/topic-op-admin/update-status/#{topic.id}.json",
+               params: {
+                 status: "archived",
+                 enabled: true,
+                 reason: "hi",
+               }
+          expect(response.status).to eq(200)
+
+          topic.reload
+          expect(topic.archived).to eq(true)
+
+          last_post = topic.posts.last
+          expect(last_post.action_code).to eq("archived.enabled")
+          expect(last_post.raw).to eq("hi")
+        end
+      end
+
+      context "when it is not allowed" do
+        fab!(:status) { Fabricate(:topic_op_admin_status, id: topic.id, can_archive: false) }
+
+        it "cannot update the status" do
+          post "/topic-op-admin/update-status/#{topic.id}.json",
+               params: {
+                 status: "archived",
+                 enabled: true,
+                 reason: "hi",
+               }
+          expect(response.status).to eq(403)
+          expect(topic.archived).to eq(false)
+        end
+      end
+    end
+  end
 end

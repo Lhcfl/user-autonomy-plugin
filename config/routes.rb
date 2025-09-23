@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 ::UserAutonomyModule::Engine.routes.draw do
-  post "/update_topic_status" => "topic_op_admin#update_topic_status"
+  post "/update-status/:id" => "topic_op_admin#update_status"
   put "/update_slow_mode" => "topic_op_admin#update_slow_mode"
   post "/set-topic-op-admin-status/:id" => "topic_op_admin#set_topic_op_admin_status"
   post "/request-for/:id" => "topic_op_admin#request_for"

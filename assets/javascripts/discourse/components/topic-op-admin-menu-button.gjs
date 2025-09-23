@@ -249,7 +249,7 @@ export default class TopicOpAdminMenuButton extends Component {
 
   toggleTopicStatus(key, reason) {
     return this._send_ajax(
-      "/topic-op-admin/update_topic_status/",
+      `/topic-op-admin/update-status/${this.topic.id}`,
       "POST",
       {
         status: key,
