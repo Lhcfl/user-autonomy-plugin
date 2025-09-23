@@ -194,14 +194,9 @@ module ::UserAutonomyModule
 
       topic = Topic.find_by(id: params[:id])
 
-      if !guardian.can_set_topic_timer_as_op?(topic) ||
-           TopicTimer.destructive_types.values.include?(status_type)
-        ::UserAutonomyModule::Bot.botLogger(
-          "@#{current_user.username} " +
-            I18n.t("topic_op_admin.log_template.without_perm.set_timer").gsub("#", topic.url) +
-            "\n```\n#{params.to_yaml}\n```",
-        )
-        return render_fail "topic_op_admin.no_perm", status: 403
+      guardian.ensure_can_set_topic_timer_as_op!(topic)
+      if TopicTimer.destructive_types.values.include?(status_type)
+        raise Discourse::InvalidAccess.new
       end
 
       options = { by_user: current_user, based_on_last_post: based_on_last_post }
@@ -243,34 +238,31 @@ module ::UserAutonomyModule
       params.require(:type)
       params.require(:reason)
 
-      topic = BotLoggingTopic.find_by(id: params[:id])
+      topic = Topic.find_by(id: params[:id])
       guardian.ensure_can_make_PM_as_op!(topic)
 
       if params[:type] == "public"
-        ::UserAutonomyModule::Bot.botLogger(
-          "@#{current_user.username} " +
-            I18n.t("topic_op_admin.log_template.without_perm.make_PM.disable").gsub(
-              "#",
-              topic.url,
-            ) + "\n```\n#{params.to_yaml}\n```",
-        )
-        return render_fail "topic_op_admin.no_perm", status: 403
+        params.require(:category_id)
+        guardian.ensure_can_create_topic_on_category!(params[:category_id])
+        topic.convert_to_public_topic(current_user, params[:category_id])
+      else
+        topic.convert_to_private_message(current_user)
       end
-
-      converted_topic = topic.convert_to_private_message(current_user)
 
       StaffActionLogger.new(current_user).log_custom "op_convert_topic",
                    topic_id: topic.id,
-                   new_value: converted_topic.archetype,
+                   new_value: topic.archetype,
                    reason: params[:reason]
 
       ::UserAutonomyModule::Bot.botLogger(
         "@#{current_user.username} " +
-          I18n.t("topic_op_admin.log_template.with_perm.make_PM.enable").gsub("#", topic.url) +
+          I18n.t(
+            "topic_op_admin.log_template.with_perm.make_PM.#{params[:type] == "public" ? "disable" : "enable"}",
+          ).gsub("#", topic.url) +
           "\n#{I18n.t("topic_op_admin.log_template.reason")} #{params[:reason]}",
       )
 
-      to_revise_post = converted_topic.posts.last
+      to_revise_post = topic.posts.last
 
       # 修订帖子
       if to_revise_post.raw == "" && to_revise_post.user_id == current_user.id
@@ -279,7 +271,7 @@ module ::UserAutonomyModule
         PostCreator.create(current_user, topic_id: topic.id, raw: params[:reason])
       end
 
-      render_topic_changes(converted_topic)
+      render_topic_changes(topic)
     end
 
     def render_fail(*args, **kwargs)
@@ -332,15 +324,7 @@ module ::UserAutonomyModule
       topic = BotLoggingTopic.find_by(id: params[:id])
 
       guardian.ensure_can_see_topic!(topic)
-
-      unless guardian.can_edit_topic_banned_user_list?(topic)
-        ::UserAutonomyModule::Bot.botLogger(
-          "@#{current_user.username} " +
-            I18n.t("topic_op_admin.log_template.without_perm.silence").gsub("#", topic.url) +
-            "\n```\n#{params.to_yaml}\n```",
-        )
-        return render_fail "topic_op_admin.no_perm", status: 403
-      end
+      guardian.ensure_can_edit_topic_banned_user_list!(topic)
 
       ::UserAutonomyModule::Bot.botLogger(
         "@#{current_user.username} " +

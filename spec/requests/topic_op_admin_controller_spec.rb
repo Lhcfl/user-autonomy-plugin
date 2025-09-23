@@ -203,4 +203,59 @@ RSpec.describe UserAutonomyModule::TopicOpAdminController do
       end
     end
   end
+
+  describe "#convert" do
+    context "when user is not the owner" do
+      before { sign_in(user) }
+
+      fab!(:status) { Fabricate(:topic_op_admin_status, id: topic.id, can_make_PM: true) }
+
+      it "cannot convert the topic" do
+        put "/topic-op-admin/convert/#{topic.id}.json",
+            params: {
+              type: "private",
+              reason: "this is reason",
+            }
+        expect(response.status).to eq(403)
+        expect(topic.archetype).to eq(Archetype.default)
+      end
+    end
+
+    context "when user is the owner" do
+      before { sign_in(topic.user) }
+
+      context "when it is allowed" do
+        fab!(:status) { Fabricate(:topic_op_admin_status, id: topic.id, can_make_PM: true) }
+
+        it "can convert the topic to private message" do
+          put "/topic-op-admin/convert/#{topic.id}.json",
+              params: {
+                type: "private",
+                reason: "this is reason",
+              }
+          expect(response.status).to eq(200)
+
+          topic.reload
+          expect(topic.archetype).to eq(Archetype.private_message)
+
+          last_post = topic.posts.last
+          expect(last_post.raw).to eq("this is reason")
+        end
+      end
+
+      context "when it is not allowed" do
+        fab!(:status) { Fabricate(:topic_op_admin_status, id: topic.id, can_make_PM: false) }
+
+        it "cannot convert the topic to private message" do
+          put "/topic-op-admin/convert/#{topic.id}.json",
+              params: {
+                type: "private",
+                reason: "this is reason",
+              }
+          expect(response.status).to eq(403)
+          expect(topic.archetype).to eq(Archetype.default)
+        end
+      end
+    end
+  end
 end
