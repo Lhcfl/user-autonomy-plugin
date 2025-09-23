@@ -118,6 +118,10 @@ module ::UserAutonomyModule
         raise Discourse::InvalidAccess.new "not the topic owner"
       end
 
+      unless topic.archetype == Archetype.default
+        raise Discourse::InvalidAccess.new "cannot apply for PMs or other types of topics"
+      end
+
       ::UserAutonomyModule::Bot.botLogger(
         "@#{current_user.username} " + I18n.t("topic_op_admin.apply_title").gsub("#", topic.url) +
           ":\n[quote=\"#{current_user.username}\"]\n#{params[:raw]}\n[/quote]",
@@ -234,20 +238,13 @@ module ::UserAutonomyModule
       end
     end
 
-    def topic_op_convert_topic
+    def convert
       params.require(:id)
       params.require(:type)
       params.require(:reason)
-      topic = BotLoggingTopic.find_by(id: params[:id])
 
-      unless guardian.can_make_PM_as_op?(topic)
-        ::UserAutonomyModule::Bot.botLogger(
-          "@#{current_user.username} " +
-            I18n.t("topic_op_admin.log_template.without_perm.make_PM.enable").gsub("#", topic.url) +
-            "\n```\n#{params.to_yaml}\n```",
-        )
-        return render_fail "topic_op_admin.no_perm", status: 403
-      end
+      topic = BotLoggingTopic.find_by(id: params[:id])
+      guardian.ensure_can_make_PM_as_op!(topic)
 
       if params[:type] == "public"
         ::UserAutonomyModule::Bot.botLogger(
@@ -258,20 +255,26 @@ module ::UserAutonomyModule
             ) + "\n```\n#{params.to_yaml}\n```",
         )
         return render_fail "topic_op_admin.no_perm", status: 403
-      else
-        converted_topic = topic.convert_to_private_message(current_user)
-        ::UserAutonomyModule::Bot.botLogger(
-          "@#{current_user.username} " +
-            I18n.t("topic_op_admin.log_template.with_perm.make_PM.enable").gsub("#", topic.url) +
-            "\n#{I18n.t("topic_op_admin.log_template.reason")} #{params[:reason]}",
-        )
       end
 
-      to_revise_post = Post.find_by(topic_id: topic.id, post_number: topic.highest_post_number + 1)
+      converted_topic = topic.convert_to_private_message(current_user)
+
+      StaffActionLogger.new(current_user).log_custom "op_convert_topic",
+                   topic_id: topic.id,
+                   new_value: converted_topic.archetype,
+                   reason: params[:reason]
+
+      ::UserAutonomyModule::Bot.botLogger(
+        "@#{current_user.username} " +
+          I18n.t("topic_op_admin.log_template.with_perm.make_PM.enable").gsub("#", topic.url) +
+          "\n#{I18n.t("topic_op_admin.log_template.reason")} #{params[:reason]}",
+      )
+
+      to_revise_post = converted_topic.posts.last
 
       # 修订帖子
       if to_revise_post.raw == "" && to_revise_post.user_id == current_user.id
-        PostRevisor.new(to_revise_post, topic).revise!(current_user, { raw: params[:reason] }, {})
+        to_revise_post.revise(current_user, raw: params[:reason])
       else
         PostCreator.create(current_user, topic_id: topic.id, raw: params[:reason])
       end

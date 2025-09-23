@@ -261,7 +261,7 @@ export default class TopicOpAdminMenuButton extends Component {
 
   convertTopic(type, reason) {
     return this._send_ajax(
-      "/topic-op-admin/topic_op_convert_topic",
+      `/topic-op-admin/convert/${this.topic.id}`,
       "PUT",
       {
         type,
@@ -273,12 +273,12 @@ export default class TopicOpAdminMenuButton extends Component {
   /** @param {String} name  */
   performToggle(name) {
     const name2handler = {
-      closed: "toggleTopicStatus",
-      visible: "toggleTopicStatus",
-      archived: "toggleTopicStatus",
-      private: "convertTopic",
+      closed: this.toggleTopicStatus.bind(this),
+      visible: this.toggleTopicStatus.bind(this),
+      archived: this.toggleTopicStatus.bind(this),
+      private: this.convertTopic.bind(this),
     };
-    const fn = this[name2handler[name]].bind(this);
+    const fn = name2handler[name];
     if (this.siteSettings.topic_op_admin_require_reason_before_action) {
       this.modal.show(TellReasonForm, {
         model: {

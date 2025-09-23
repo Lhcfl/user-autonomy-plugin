@@ -62,6 +62,10 @@ en:
       site_settings:
         categories:
           user_autonomy: User Autonomy
+      logs:
+        staff_actions:
+          actions:
+            op_convert_topic: "OP converted topic type"
     user_autonomy_plugin:
       topic_op_admin:
         enable_topic_op_admin: "Enable Topic OP admin"
